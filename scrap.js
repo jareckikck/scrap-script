@@ -1,20 +1,8 @@
+const config = require("./config");
 const firebase = require("firebase");
 const puppeteer = require("puppeteer");
-// FIREBASE CONFIG
-const firebaseConfig = {
-  apiKey: "FIREABASE_API_KEY",
-  authDomain: "xxx",
-  databaseURL: "xxx",
-  projectId: "xxx",
-  storageBucket: "xxx",
-  messagingSenderId: "xxx",
-  appId: "xxx"
-};
-const credentials = {
-  email: "dummy@email.com",
-  pass: "dummyPass"
-};
-firebase.initializeApp(firebaseConfig);
+
+firebase.initializeApp(config.firebase);
 
 let db = firebase.firestore();
 let scrapResults = db.collection("scrapResults");
@@ -24,19 +12,19 @@ loginToFirebase();
 
 firebase.auth().onAuthStateChanged(function(user) {
   if (user) {
-		console.log('scrap')
-		loadConfigAndScrap("allegro");
-  } 
+    loadConfigAndScrap("allegro");
+  }
 });
 
 function getDate() {
-  var today = new Date();
-  var dd = String(today.getDate()).padStart(2, "0");
-  var mm = String(today.getMonth() + 1).padStart(2, "0"); //January is 0!
-  var yyyy = today.getFullYear();
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2, "0");
+  const mm = String(today.getMonth() + 1).padStart(2, "0"); //January is 0!
+  const yyyy = today.getFullYear();
 
   return mm + "." + dd + "." + yyyy;
 }
+
 function loadConfigAndScrap(name) {
   scrapSiteConfig
     .where("name", "==", name)
@@ -52,16 +40,19 @@ function loadConfigAndScrap(name) {
       console.log("Error getting documents: ", error);
     });
 }
-// function
-function loginToFirebase() {	
+
+function loginToFirebase() {
   firebase
     .auth()
-    .signInWithEmailAndPassword(credentials.email, credentials.pass)
+    .signInWithEmailAndPassword(
+      config.credentials.email,
+      config.credentials.pass
+    )
     .catch(function(error) {
-			console.log(error.code, error.message);			
+      console.log(error.code, error.message);
     });
 }
-//
+
 function saveData(id, data) {
   console.log("start SaveData");
   scrapResults
@@ -69,22 +60,26 @@ function saveData(id, data) {
     .set(data)
     .then(function() {
       console.log("Document successfully written!");
+      process.exit();
     })
     .catch(function(error) {
       console.error("Error writing document: ", error);
+      process.abort();
     });
 }
 
 function scrapData(allegro) {
   try {
     (async () => {
-      const browser = await puppeteer.launch();
-      const page = await browser.newPage();
       let queryResult = [];
 
+      //open browser
+      const browser = await puppeteer.launch();
+      const page = await browser.newPage();
       await page.setViewport({ width: 1280, height: 800 });
       await page.goto(allegro.url);
 
+      //close pop up
       if ((await page.$(allegro.popUpAccClass)) !== null) {
         console.log("close pop up");
         await page.click(allegro.popUpAccClass);
@@ -92,9 +87,11 @@ function scrapData(allegro) {
         console.log("pop up not found");
       }
 
+      //search for query
       await page.type(allegro.searchForm, allegro.searchQuery);
       await page.click(allegro.searchInput);
 
+      //get results
       await page.waitForSelector(allegro.itemContainer);
       const item = await page.$$(allegro.item);
       for (let i = 0; i < allegro.resultsLimit; i++) {
@@ -107,18 +104,22 @@ function scrapData(allegro) {
         queryResult.push(position);
         console.log(`${i} item:  title - ${title}, price -  ${price}`);
       }
-
+      //  close browser
       await browser.close();
 
+      //prepare firebase objec
       let firebaseData = {
         queryResult: queryResult,
         searchQuery: allegro.searchQuery,
         srappedFrom: allegro.name,
         date: getDate()
-      };		
+      };
+
+      //save data to firebase
       saveData(Date.now().toString(), firebaseData);
     })();
   } catch (err) {
     console.error(err);
+    process.abort();
   }
 }
