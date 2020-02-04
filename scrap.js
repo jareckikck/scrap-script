@@ -2,28 +2,40 @@ const firebase = require("firebase");
 const puppeteer = require("puppeteer");
 // FIREBASE CONFIG
 const firebaseConfig = {
-  apiKey: "AIzaSyDCUZkh4Klcm4dEjq3KyfJqXuSUA003UVo",
-  authDomain: "workspace-1cdf1.firebaseapp.com",
-  databaseURL: "https://workspace-1cdf1.firebaseio.com",
-  projectId: "workspace-1cdf1",
-  storageBucket: "workspace-1cdf1.appspot.com",
-  messagingSenderId: "261466315114",
-  appId: "1:261466315114:web:ffb1b2ccc2e87e15f1ed13"
+  apiKey: "FIREABASE_API_KEY",
+  authDomain: "xxx",
+  databaseURL: "xxx",
+  projectId: "xxx",
+  storageBucket: "xxx",
+  messagingSenderId: "xxx",
+  appId: "xxx"
+};
+const credentials = {
+  email: "dummy@email.com",
+  pass: "dummyPass"
 };
 firebase.initializeApp(firebaseConfig);
 
 let db = firebase.firestore();
 let scrapResults = db.collection("scrapResults");
 let scrapSiteConfig = db.collection("scrapSiteConfig");
-loadConfigAndScrap('allegro');
 
-function getDate(){
-	var today = new Date();
+loginToFirebase();
+
+firebase.auth().onAuthStateChanged(function(user) {
+  if (user) {
+		console.log('scrap')
+		loadConfigAndScrap("allegro");
+  } 
+});
+
+function getDate() {
+  var today = new Date();
   var dd = String(today.getDate()).padStart(2, "0");
   var mm = String(today.getMonth() + 1).padStart(2, "0"); //January is 0!
   var yyyy = today.getFullYear();
 
-  return  mm + "." + dd + "." + yyyy;
+  return mm + "." + dd + "." + yyyy;
 }
 function loadConfigAndScrap(name) {
   scrapSiteConfig
@@ -40,7 +52,16 @@ function loadConfigAndScrap(name) {
       console.log("Error getting documents: ", error);
     });
 }
-
+// function
+function loginToFirebase() {	
+  firebase
+    .auth()
+    .signInWithEmailAndPassword(credentials.email, credentials.pass)
+    .catch(function(error) {
+			console.log(error.code, error.message);			
+    });
+}
+//
 function saveData(id, data) {
   console.log("start SaveData");
   scrapResults
@@ -59,7 +80,7 @@ function scrapData(allegro) {
     (async () => {
       const browser = await puppeteer.launch();
       const page = await browser.newPage();
-			let queryResult = [];
+      let queryResult = [];
 
       await page.setViewport({ width: 1280, height: 800 });
       await page.goto(allegro.url);
@@ -87,19 +108,17 @@ function scrapData(allegro) {
         console.log(`${i} item:  title - ${title}, price -  ${price}`);
       }
 
-			await browser.close();
-			
+      await browser.close();
+
       let firebaseData = {
         queryResult: queryResult,
         searchQuery: allegro.searchQuery,
-				srappedFrom: allegro.name,
-				date: getDate()
-			};            
-			
+        srappedFrom: allegro.name,
+        date: getDate()
+      };		
       saveData(Date.now().toString(), firebaseData);
     })();
   } catch (err) {
     console.error(err);
   }
 }
-
